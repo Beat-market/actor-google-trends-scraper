@@ -25,6 +25,7 @@ Apify.main(async () => {
         searchTerms,
         spreadsheetId,
         isPublic = false,
+        compareKeywords = false,
         timeRange,
         category,
         maxItems = null,
@@ -45,6 +46,7 @@ Apify.main(async () => {
     // initialize request list from url sources
     const { sources, sheetTitle } = await checkAndCreateUrlSource(
         searchTerms,
+        compareKeywords,
         spreadsheetId,
         isPublic,
         timeRange,
@@ -135,7 +137,7 @@ Apify.main(async () => {
                 };
 
                 // Returns truhly value if the data selector is found
-                const waitForDataSelector = page.waitForSelector('svg ~ div > table > tbody', { timeout: 30000 });
+                const waitForDataSelector = page.waitForSelector(`svg ~ div > table > tbody`, { timeout: 30000 });
 
                 // Evaluates either to boolean (false if empty data) or a truthly selector
                 const hasData = await Promise.race([waitForDataSelector, waitForEmptyDataSelector()]);
@@ -158,8 +160,9 @@ Apify.main(async () => {
                     return;
                 }
 
-                const results = await page.evaluate(() => {
-                    const tbody = document.querySelector('svg ~ div > table > tbody');
+                const results = await page.evaluate((compareKeywords) => {
+                    let parentElementSelector = compareKeywords ? 'line-chart-directive ' : '';
+                    const tbody = document.querySelector(`${parentElementSelector}svg ~ div > table > tbody`);
                     const trs = Array.from(tbody.children);
 
                     // results is an array of arrays which contains in pos 0 the date, pos 1 the value
@@ -175,11 +178,10 @@ Apify.main(async () => {
                     });
 
                     return r;
-                });
+                }, compareKeywords);
 
-                // Prepare object to be pushed
-                const resObject = Object.create(null);
-                resObject[sheetTitle] = searchTerm;
+                const keywords = searchTerm.split(',');
+                const keywordHashObject = {};
 
                 for (const res of results) {
                     // res[0] holds the date, res[1] holds the value. The date will be the name of the column when dataset is exported to spreadsheet
@@ -189,15 +191,30 @@ Apify.main(async () => {
                         buf = buf.slice(3).slice(0, -3);
                     }
 
-                    const key = buf.toString();
-                    // same day keys are missing the year
-                    resObject[outputAsISODate ? parseKeyAsIsoDate(key) : key] = Number(res[1]);
+                    let key = buf.toString();
+                    key = outputAsISODate ? parseKeyAsIsoDate(key) : key;
+                    const keywordValues = res.slice(1);
+
+                    for (const [index, value] of keywordValues.entries()) {
+                        const keyword = keywords[index];
+                        let resObject = keywordHashObject[keyword];
+                        if (!keywordHashObject.hasOwnProperty(keyword)) {
+                            resObject = Object.create(null);
+                            resObject[sheetTitle] = keyword;
+
+                            keywordHashObject[keyword] = resObject;
+                        }
+                        // same day keys are missing the year
+                        resObject[key] = Number(value);
+                    }
                 }
 
                 const result = await applyFunction(page, extendOutputFunction);
 
-                // push, increase itemCount, log
-                await Apify.pushData({ ...resObject, ...result });
+                for (const resultObj of Object.values(keywordHashObject)) {
+                    // push, increase itemCount, log
+                    await Apify.pushData({ ...resultObj, ...result });
+                }
 
                 itemCount++;
                 log.info(`Results for "${searchTerm}" pushed successfully.`);

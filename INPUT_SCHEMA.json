@@ -10,6 +10,13 @@
             "description": "(Required if 'spreadsheetId' is not provided) List of search terms to be scraped.",
             "example": [ "CNN", "BBC", "Al Jazeera" ]
         },
+        "compareKeywords": {
+            "title": "Compare search terms mode",
+            "type": "boolean",
+            "editor": "checkbox",
+            "description": "If checked all the provided search terms will be compared to eatch other in google trends",
+            "default": false
+        },
         "spreadsheetId": {
             "title": "Spreadsheet id",
             "type": "string",
