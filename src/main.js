@@ -128,7 +128,7 @@ Apify.main(async () => {
 
                 // Returns false value if the empty selector is found
                 const waitForEmptyDataSelector = async () => {
-                    await page.waitForSelector('[widget-name=TIMESERIES]', { timeout: 30000 });
+                    await page.waitForSelector('[widget-name=TIMESERIES]', { timeout: 120000 });
                     await page.waitForFunction(async () => {
                         const widget = document.querySelector('[widget-name=TIMESERIES]');
                         return !!widget.querySelector('p.widget-error-title');
@@ -137,7 +137,7 @@ Apify.main(async () => {
                 };
 
                 // Returns truhly value if the data selector is found
-                const waitForDataSelector = page.waitForSelector(`svg ~ div > table > tbody`, { timeout: 30000 });
+                const waitForDataSelector = page.waitForSelector(`svg ~ div > table > tbody`, { timeout: 120000 });
 
                 // Evaluates either to boolean (false if empty data) or a truthly selector
                 const hasData = await Promise.race([waitForDataSelector, waitForEmptyDataSelector()]);
