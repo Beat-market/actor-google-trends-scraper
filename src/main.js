@@ -137,30 +137,39 @@ Apify.main(async () => {
                 };
 
                 // Returns truhly value if the data selector is found
-                const waitForDataSelector = page.waitForSelector('svg ~ div > table > tbody tr', { timeout: 30000 });
+                try {
+                    let parentElementSelector = compareKeywords ? 'line-chart-directive ' : '';
+                    const waitForDataSelector = page.waitForSelector(`${parentElementSelector}svg ~ div > table > tbody tr`, { timeout: 40000 });
 
-                // Evaluates either to boolean (false if empty data) or a truthly selector
-                const hasData = await Promise.race([
-                    waitForDataSelector,
-                    waitForEmptyDataSelector(),
-                ]);
+                    // Evaluates either to boolean (false if empty data) or a truthly selector
+                    const hasData = await Promise.race([
+                        waitForDataSelector,
+                        waitForEmptyDataSelector(),
+                    ]);
 
-                // if no data, push message and return!
-                if (!hasData) {
-                    const resObject = Object.create(null);
-                    resObject[sheetTitle] = searchTerm;
-                    resObject.message = 'The search term displays no data.';
+                    // if no data, push message and return!
+                    if (!hasData) {
+                        const resObject = Object.create(null);
+                        resObject[sheetTitle] = searchTerm;
+                        resObject.message = 'The search term displays no data.';
 
-                    const result = await applyFunction(page, extendOutputFunction);
+                        const result = await applyFunction(page, extendOutputFunction);
 
-                    await Apify.pushData({ ...resObject, ...result });
+                        await Apify.pushData({ ...resObject, ...result });
 
-                    log.info(`The search term "${searchTerm}" displays no data.`);
+                        log.info(`The search term "${searchTerm}" displays no data.`);
+                        await Apify.utils.puppeteer.saveSnapshot(page, {
+                            key: `NO-DATA-${searchTerm.replace(/[^a-zA-Z0-9-_]/g, '-')}`,
+                            saveHtml: false,
+                        });
+                        return;
+                    }
+                } catch(e) {
                     await Apify.utils.puppeteer.saveSnapshot(page, {
-                        key: `NO-DATA-${searchTerm.replace(/[^a-zA-Z0-9-_]/g, '-')}`,
+                        key: `ERROR-${searchTerm.replace(/[^a-zA-Z0-9-_]/g, '-')}`,
                         saveHtml: false,
                     });
-                    return;
+                    throw e;
                 }
 
                 /**
