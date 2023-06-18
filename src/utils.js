@@ -45,7 +45,7 @@ function validateInput(input) {
  * @param {{
  *   geo: string,
  *   category: string,
- *   searchTerm: string,
+ *   searchTerm: string|array,
  *   timeRangeToUse: string,
  * }} params
  */
@@ -64,12 +64,26 @@ function newUrl({ geo, timeRangeToUse, category, searchTerm }) {
         nUrl.searchParams.set('cat', category);
     }
 
-    nUrl.searchParams.set('q', decodeURIComponent(searchTerm)); // accepts %2F and /
+    if (searchTerm instanceof Array) {
+        const searchTermsToCompare = searchTerm;
+        searchTerm = '';
+        for (const [index, term] of searchTermsToCompare.entries()){
+            searchTerm += decodeURIComponent(term)
+
+            if (index < searchTermsToCompare.length-1) {
+                searchTerm += ',';
+            }
+        }
+    } else {
+        searchTerm = decodeURIComponent(searchTerm)
+    }
+
+    nUrl.searchParams.set('q', searchTerm); // accepts %2F and /
 
     return nUrl.toString();
 }
 
-async function checkAndCreateUrlSource(searchTerms, spreadsheetId, isPublic, timeRange, category, customTimeRange, geo) {
+async function checkAndCreateUrlSource(searchTerms, compareKeywords, spreadsheetId, isPublic, timeRange, category, customTimeRange, geo) {
     /** @type {Apify.RequestOptions[]} */
     const sources = [];
     /** @type {any[]} */
@@ -78,16 +92,28 @@ async function checkAndCreateUrlSource(searchTerms, spreadsheetId, isPublic, tim
     const timeRangeToUse = customTimeRange || timeRange;
 
     if (searchTerms) {
-        for (const searchTerm of searchTerms) {
+        if (compareKeywords) {
             sources.push({
                 url: newUrl({
                     geo,
                     category,
                     timeRangeToUse,
-                    searchTerm,
+                    searchTerm: searchTerms,
                 }),
                 userData: { label: 'SEARCH' },
             });
+        } else {
+            for (const searchTerm of searchTerms) {
+                sources.push({
+                    url: newUrl({
+                        geo,
+                        category,
+                        timeRangeToUse,
+                        searchTerm,
+                    }),
+                    userData: { label: 'SEARCH' }
+                });
+            }
         }
     }
 
@@ -133,6 +159,10 @@ async function checkAndCreateUrlSource(searchTerms, spreadsheetId, isPublic, tim
     const sheetTitle = spreadsheetId ? Object.keys(output[0])[0] : 'Term / Date';
 
     log.info(`Created ${sources.length} Start URLs`);
+
+    for (const source of sources) {
+        log.info(`${source.url}`);
+    }
 
     return { sources, sheetTitle };
 }
