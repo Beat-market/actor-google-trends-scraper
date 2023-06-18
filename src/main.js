@@ -177,27 +177,24 @@ Apify.main(async () => {
                  */
                 const results = await page.evaluate((compareKeywords) => {
                     let parentElementSelector = compareKeywords ? 'line-chart-directive ' : '';
-                    const trs = [...document.querySelectorAll(`${parentElementSelector}svg ~ div > table > tbody tr`)].filter((el) => !el.closest('.hiddenDiv,bar-chart'));
+                    const tbody = document.querySelector(`${parentElementSelector}svg ~ div > table > tbody`);
+                    const trs = Array.from(tbody.children);
 
                     // results is an array of arrays which contains in pos 0 the date, pos 1 the value
-                    return trs.map((tr) => {
+                    const r = trs.map((tr) => {
                         const result = [];
 
                         const tds = Array.from(tr.children);
-                        /** @type {string[]} */
-                        const values = [];
-
-                        result.push(tds[0].textContent.trim());
-
-                        tds.slice(1).forEach((td) => {
-                            values.push(td.textContent.trim());
+                        tds.forEach((td) => {
+                            result.push(td.textContent.trim());
                         });
-
-                        result.push(values);
 
                         return result;
                     });
+
+                    return r;
                 }, compareKeywords);
+                log.info(`Intermediate results`, results);
 
                 const keywords = searchTerm.split(',');
                 const keywordHashObject = {};
@@ -227,6 +224,8 @@ Apify.main(async () => {
                         resObject[key] = Number(value);
                     }
                 }
+
+                log.info(`Keyword hash object`, keywordHashObject);
 
                 const result = await applyFunction(page, extendOutputFunction);
 
